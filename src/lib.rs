@@ -1,5 +1,9 @@
+mod history_reader;
+
 use bitbit::{BitReader, BitWriter, MSB};
 use std::io::{BufReader, BufWriter, Read, Write, Result};
+use std::collections::VecDeque;
+use history_reader::*;
 
 type HistoryAddress = u32;
 type MatchLength = u16;
@@ -10,13 +14,10 @@ const BITS_FOR_HISTORY_ADDR_NBTIS: usize = 5;
 const BITS_FOR_MATCH_LENGTH_NBITS: usize = 4;
 
 pub struct Encoder {
-    history: Vec<u8>,
-    current_window: Vec<u8>,
-    threshold: u8,    // When to encode
+    threshold: u8,          // When to encode
     history_addr_nbits: u8, // Number of bits used for addressing history
     match_length_nbits: u8, // Number of bits used for specifying length of a match
-    start_at: u8,     // At what byte of the input file to start encoding
-    search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
+    search_depth: u8,       // 0 - longest match, 1 - first match, 2 - longest of the first two matches
 }
 
 impl Encoder {
@@ -26,50 +27,54 @@ impl Encoder {
         search_depth: u8,
     ) -> Encoder {
         assert!(
-            history_addr_nbits >= 4,
-            "History address size must be in range of [4, 31] bits"
+            history_addr_nbits >= 3 && history_addr_nbits <= 31,
+            "History address size must be in range of [3, 31] bits"
         );
         assert!(
-            match_length_nbits >= 2,
+            match_length_nbits >= 2 && match_length_nbits <= 15,
             "Current window address size must be in range of [2, 15] bits"
         );
-        let history_size: HistoryAddress =
-            HistoryAddress::checked_pow(2 as HistoryAddress, history_addr_nbits as u32)
-                .expect("History address size must be in range of [4, 31] bits");
-        let now_size: MatchLength =
-            MatchLength::checked_pow(2 as MatchLength, match_length_nbits as u32)
-                .expect("Current window address size must be in range of [2, 15] bits");
+        assert!(
+            history_addr_nbits > match_length_nbits,
+            "History size has to be bigger than current window size"
+        );
 
         let record_1_size: u8 = 1 + history_addr_nbits + match_length_nbits;
         let record_2_size: u8 = 1 + 8;
         let threshold: u8 = (record_1_size / record_2_size) + 1;
-        let start_at: u8 = (record_1_size / 8) + 1; // That's when it becomes to be possible to get compression
 
         Encoder {
-            history: Vec::with_capacity(history_size as usize),
-            current_window: Vec::with_capacity(now_size as usize),
             threshold,
             history_addr_nbits,
             match_length_nbits,
-            start_at,
             search_depth,
         }
     }
 
     pub fn encode<R: Read, W: Write>(&self, reader: &mut R, writer: &mut W) -> Result<()> {
-        let mut br: BitReader<_, MSB> = BitReader::new(reader);
-        let num = br.read_bits(5).unwrap();
-        println!("{}", num);
-
         let mut bw = BitWriter::new(&mut *writer);
-
         self.write_header(&mut bw)?;
+
+        let history_size: HistoryAddress =
+            HistoryAddress::pow(2 as HistoryAddress, self.history_addr_nbits as u32);
+        let current_window_size: MatchLength =
+            MatchLength::pow(2 as MatchLength, self.match_length_nbits as u32);
+        let start_at: usize = (current_window_size + 1) as usize;
+        let reader = HistoryReader::new(reader, history_size as usize, current_window_size as usize);
+
+        //reader.
 
         bw.pad_to_byte()?;
         writer.flush()?;
 
         Ok(())
     }
+
+    // pub fn decode<R: Read, W: Write>(&self, reader: &mut R, writer: &mut W) -> Result<()> {
+    //     let mut br: BitReader<_, MSB> = BitReader::new(reader);
+    //     let num = br.read_bits(5).unwrap();
+    //     println!("{}", num);
+    // }
 
     fn write_header<W: Write>(&self, bw: &mut BitWriter<W>) -> Result<()> {
         bw.write_bits(self.history_addr_nbits as u32, BITS_FOR_HISTORY_ADDR_NBTIS)?;
