@@ -60,10 +60,10 @@ impl<R: Read> HistoryReader<R> {
         let buff = &mut self.buffer[buff_len..new_size];
 
         let bytes_read = self.reader.read(buff)?;
-        println!(
-            "window_size: {}, move_bytes: {}, bytes_read: {}",
-            self.window_size, move_bytes, bytes_read
-        );
+        // println!(
+        //     "window_size: {}, move_bytes: {}, bytes_read: {}",
+        //     self.window_size, move_bytes, bytes_read
+        // );
 
         let (to_pop, history_size_change) = if bytes_read < move_bytes {
             // Current window should get smaller by this amount
@@ -90,39 +90,12 @@ impl<R: Read> HistoryReader<R> {
         for _ in 0..to_pop {
             self.buffer.pop_front();
         }
-        // // We resized to get exactly move_bytes. Have resize to the actual.
-        // let rem = std::cmp::min(self.window_size, move_bytes - bytes_read);
-        // let to_add_history = if rem > 0 {
-        //     for _ in 0..rem {
-        //         self.buffer.pop_back();
-        //     }
-        //     // Means current window got smaller
-        //     self.window_size -= rem;
-        //     rem     // We want history to expand by this amount at this point
-        // } else {
-        //     0
-        // };
-
-        // // Adjust history window
-        // let history_diff = self.history_size - self.current_history_size;
-        // let to_pop = if history_diff < bytes_read {
-        //     let to_add = std::cmp::max(history_diff, to_add_history);
-        //     self.current_history_size += to_add;
-        //     if bytes_read > to_add {
-        //         bytes_read - to_add
-        //     } else {
-        //         move_bytes - bytes_read - history_diff
-        //     }
-        // } else {
-        //     self.current_history_size += bytes_read + to_add_history;
-        //     0
-        // };
 
         let buff_len = self.buffer.len();
-        println!(
-            "current_history_size: {}, current_window_size: {}",
-            self.current_history_size, self.window_size
-        );
+        // println!(
+        //     "current_history_size: {}, current_window_size: {}",
+        //     self.current_history_size, self.window_size
+        // );
         Ok((
             &self.buffer[0..self.current_history_size],
             &self.buffer[self.current_history_size..buff_len],

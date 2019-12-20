@@ -4,6 +4,7 @@ mod history_reader;
 use bitbit::BitWriter;
 use history_reader::*;
 use std::io::{Read, Result, Write};
+use std::cmp;
 
 type HistoryAddress = u32;
 type MatchLength = u16;
@@ -14,10 +15,10 @@ const BITS_FOR_HISTORY_ADDR_NBTIS: usize = 5;
 const BITS_FOR_MATCH_LENGTH_NBITS: usize = 4;
 
 pub struct Encoder {
-    _threshold: u8,         // When to encode
+    threshold: u8,          // When to encode
     history_addr_nbits: u8, // Number of bits used for addressing history
     match_length_nbits: u8, // Number of bits used for specifying length of a match
-    _search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
+    search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
 }
 
 impl Encoder {
@@ -40,11 +41,64 @@ impl Encoder {
         let threshold: u8 = (record_1_size / record_2_size) + 1;
 
         Encoder {
-            _threshold: threshold,
+            threshold,
             history_addr_nbits,
             match_length_nbits,
-            _search_depth: search_depth,
+            search_depth,
         }
+    }
+
+    // Returns the position of the first match and length of a matching byte string. 
+    // Match might be smaller than subsequence.
+    pub fn find_first_match(&self, sequence: &[u8], subsequence: &[u8]) -> (usize, usize) {
+        let (subs_len, seq_len) = (subsequence.len(), sequence.len());
+        assert!(seq_len >= subs_len);
+
+        let mut match_count = 0;
+        let mut match_start = 0;
+        for (pos, item) in sequence.iter().enumerate() {
+            if *item == subsequence[match_count] {
+                if match_count == 0 { // First match
+                    match_start = pos;
+                }
+                match_count += 1;
+                
+                if match_count == subs_len { // Whole match was found
+                    return (match_start, match_count);
+                }
+            } else if match_count > 0 { // Matching string of bytes has ended
+                return (match_start, match_count);
+            }
+        }
+
+        (match_start, match_count)
+    }
+
+    // Find best match, based on search_depth
+    // Returns it's position and length in sequence
+    pub fn find_best_match(&self, sequence: &[u8], subsequence: &[u8]) -> (usize, usize) {
+        let mut best_match: (usize, usize) = (0, 0);
+        let (mut matches_found, mut pos) = (0, 0);
+        let seq_len = sequence.len();
+
+        while pos < seq_len && (self.search_depth == 0 || matches_found < self.search_depth) {
+            let seq = &sequence[pos..seq_len];
+            let subs_len = cmp::min(subsequence.len(), seq.len());
+            let subs = &subsequence[0..subs_len];
+            let (match_pos, match_len) = self.find_first_match(seq, subs);
+            if match_len > 0 {
+                pos = match_pos + 1;  // Continue search from the next byte
+                if match_len >= self.threshold as usize {
+                    if match_len > best_match.1 {
+                        best_match = (match_pos, match_len);
+                    }            
+                    matches_found += 1; // Only counting matches which reach threshold
+                }
+            } else { // No match was found. Means we have searched all of it.
+                break;
+            }
+        }
+        best_match
     }
 
     pub fn encode<R: Read, W: Write>(&self, reader: &mut R, writer: &mut W) -> Result<()> {
@@ -60,20 +114,24 @@ impl Encoder {
 
         let (mut window, mut history) = reader.current();
 
-        println!("History: {:#x?}", history);
-        println!("Window: {:#x?}", window);
-        let mut i = 0;
+        // println!("History: {:#x?}", history);
+        // println!("Window: {:#x?}", window);
+        let (mut match_pos, mut match_len) = (0, 0);
         while !window.is_empty() {
-            // FIXME: Convert to usize once
             let win_len = window.len();
-            let new = reader.next(win_len)?;
+            let move_bytes = cmp::min(win_len, cmp::min(1, match_len));
+            let new = reader.next(move_bytes)?;
             history = new.0;
             window = new.1;
 
-            println!("History: {:#x?}", history);
-            println!("Window: {:#x?}", window);
-            println!("Run: {}", i);
-            i += 1;
+            let bmatch = self.find_best_match(history, window);
+            match_pos = bmatch.0;
+            match_len = bmatch.1;
+            println!("pos: {}, len: {}", match_pos, match_len);
+
+            // println!("History: {:#x?}", history);
+            // println!("Window: {:#x?}", window);
+            // println!("Run: {}", i);
         }
 
         bw.pad_to_byte()?;

@@ -72,7 +72,7 @@ fn main() {
         );
         let res = encoder.encode(&mut buff_reader, &mut buff_writer);
         if res.is_err() {
-            panic!(res.err().unwrap());
+            panic!("Error encoding: {}", res.err().unwrap());
         }
     } else {
         panic!("Not implemented yet");
