@@ -59,10 +59,22 @@ impl Encoder {
             HistoryAddress::pow(2 as HistoryAddress, self.history_addr_nbits as u32);
         let current_window_size: MatchLength =
             MatchLength::pow(2 as MatchLength, self.match_length_nbits as u32);
-        let start_at: usize = (current_window_size + 1) as usize;
-        let reader = HistoryReader::new(reader, history_size as usize, current_window_size as usize);
+        let mut reader = HistoryReader::new(reader, history_size as usize, current_window_size as usize)?;
 
-        //reader.
+        let (mut window, mut history) = reader.current();
+
+        println!("History: {:#x?}", history);
+        println!("Window: {:#x?}", window);
+        while !window.is_empty() {
+            // FIXME: Convert to usize once
+            let win_len = window.len();
+            let new = reader.next(win_len)?;
+            history = new.0;
+            window = new.1;
+
+            println!("History: {:#x?}", history);
+            println!("Window: {:#x?}", window);
+        }
 
         bw.pad_to_byte()?;
         writer.flush()?;
