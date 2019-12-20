@@ -1,31 +1,27 @@
 mod history_reader;
 
-use bitbit::{BitReader, BitWriter, MSB};
-use std::io::{BufReader, BufWriter, Read, Write, Result};
-use std::collections::VecDeque;
+//use bitbit::{BitReader, BitWriter, MSB};
+use bitbit::BitWriter;
 use history_reader::*;
+use std::io::{Read, Result, Write};
 
 type HistoryAddress = u32;
 type MatchLength = u16;
 
 // Number of bits needed to encode history address size (in bits) in the header
-const BITS_FOR_HISTORY_ADDR_NBTIS: usize = 5; 
+const BITS_FOR_HISTORY_ADDR_NBTIS: usize = 5;
 // Number of bits needed to encode max match length size (in bits) in the header
 const BITS_FOR_MATCH_LENGTH_NBITS: usize = 4;
 
 pub struct Encoder {
-    threshold: u8,          // When to encode
+    _threshold: u8,         // When to encode
     history_addr_nbits: u8, // Number of bits used for addressing history
     match_length_nbits: u8, // Number of bits used for specifying length of a match
-    search_depth: u8,       // 0 - longest match, 1 - first match, 2 - longest of the first two matches
+    _search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
 }
 
 impl Encoder {
-    pub fn new(
-        history_addr_nbits: u8,
-        match_length_nbits: u8,
-        search_depth: u8,
-    ) -> Encoder {
+    pub fn new(history_addr_nbits: u8, match_length_nbits: u8, search_depth: u8) -> Encoder {
         assert!(
             history_addr_nbits >= 3 && history_addr_nbits <= 31,
             "History address size must be in range of [3, 31] bits"
@@ -44,10 +40,10 @@ impl Encoder {
         let threshold: u8 = (record_1_size / record_2_size) + 1;
 
         Encoder {
-            threshold,
+            _threshold: threshold,
             history_addr_nbits,
             match_length_nbits,
-            search_depth,
+            _search_depth: search_depth,
         }
     }
 
@@ -59,12 +55,14 @@ impl Encoder {
             HistoryAddress::pow(2 as HistoryAddress, self.history_addr_nbits as u32);
         let current_window_size: MatchLength =
             MatchLength::pow(2 as MatchLength, self.match_length_nbits as u32);
-        let mut reader = HistoryReader::new(reader, history_size as usize, current_window_size as usize)?;
+        let mut reader =
+            HistoryReader::new(reader, history_size as usize, current_window_size as usize)?;
 
         let (mut window, mut history) = reader.current();
 
         println!("History: {:#x?}", history);
         println!("Window: {:#x?}", window);
+        let mut i = 0;
         while !window.is_empty() {
             // FIXME: Convert to usize once
             let win_len = window.len();
@@ -74,6 +72,8 @@ impl Encoder {
 
             println!("History: {:#x?}", history);
             println!("Window: {:#x?}", window);
+            println!("Run: {}", i);
+            i += 1;
         }
 
         bw.pad_to_byte()?;

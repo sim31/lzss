@@ -2,8 +2,8 @@
 extern crate clap;
 use clap::AppSettings;
 use lzss::*;
-use std::fs::{OpenOptions, File};
-use std::io::{BufReader, BufWriter, Result};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufWriter};
 
 fn main() {
     let arg_matches = clap_app!(lzss =>
@@ -27,7 +27,9 @@ fn main() {
        )
     ).setting(AppSettings::ArgRequiredElseHelp).get_matches();
 
-    let subcommand_str = arg_matches.subcommand_name().expect("Subcommand is required");
+    let subcommand_str = arg_matches
+        .subcommand_name()
+        .expect("Subcommand is required");
     if subcommand_str == "encode" {
         let sub_arg_matches = arg_matches.subcommand_matches("encode").unwrap();
 
@@ -37,16 +39,36 @@ fn main() {
 
         let filepath = sub_arg_matches.value_of("ARCHIVE_PATH").unwrap();
         let dest_file = if sub_arg_matches.is_present("overwrite") {
-            OpenOptions::new().write(true).create(true).open(filepath).unwrap()
+            OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(filepath)
+                .unwrap()
         } else {
-            OpenOptions::new().write(true).create_new(true).open(filepath).unwrap()
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(filepath)
+                .unwrap()
         };
         let mut buff_writer = BufWriter::new(dest_file);
 
         let encoder = Encoder::new(
-            sub_arg_matches.value_of("history_size").unwrap().parse().expect("Unable to parse history_size"),
-            sub_arg_matches.value_of("current_size").unwrap().parse().expect("Unable to parse current_size"),
-            sub_arg_matches.value_of("search_depth").unwrap().parse().expect("Unable to parse search_depth"),
+            sub_arg_matches
+                .value_of("history_size")
+                .unwrap()
+                .parse()
+                .expect("Unable to parse history_size"),
+            sub_arg_matches
+                .value_of("current_size")
+                .unwrap()
+                .parse()
+                .expect("Unable to parse current_size"),
+            sub_arg_matches
+                .value_of("search_depth")
+                .unwrap()
+                .parse()
+                .expect("Unable to parse search_depth"),
         );
         let res = encoder.encode(&mut buff_reader, &mut buff_writer);
         if res.is_err() {
@@ -62,6 +84,6 @@ fn main() {
     // println!("{}", num);
 }
 
-fn construct_archive_path(filepath: &str) -> String {
-    format!("{}.lzss", filepath)
-}
+// fn construct_archive_path(filepath: &str) -> String {
+//     format!("{}.lzss", filepath)
+// }
