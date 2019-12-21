@@ -35,9 +35,9 @@ pub fn best_match(sequence: &[u8],
                        threshold: usize,
                        search_depth: usize) -> (usize, usize) {
 
-   println!("\n----\nsequence: \"{}\"", std::str::from_utf8(sequence).unwrap());
-   println!("subsequence: \"{}\"", std::str::from_utf8(subsequence).unwrap());
-   println!("threshold: {}", threshold);
+   // println!("\n----\nsequence: \"{}\"", std::str::from_utf8(sequence).unwrap());
+   // println!("subsequence: \"{}\"", std::str::from_utf8(subsequence).unwrap());
+   // println!("threshold: {}", threshold);
    let mut best_match: (usize, usize) = (0, 0);
    let (mut matches_found, mut pos): (usize, usize) = (0, 0);
    let seq_len = sequence.len();
@@ -65,4 +65,56 @@ pub fn best_match(sequence: &[u8],
       }
    }
    best_match
+}
+
+#[cfg(test)]
+mod test {
+   use super::*;
+   use rand;
+
+   fn fill_with_random(buffer: &mut [u8], prob: u8) {
+      for el in buffer {
+         *el = rand::random::<u8>() % prob;
+      }
+   }
+
+   #[test]
+   fn are_matches_valid() {
+      for _ in 0..12 {
+         let mut sequence: [u8; 16] = [0; 16];
+         fill_with_random(&mut sequence, 4);
+         let subsequence: [u8; 8] = [0,3,3,2,1,0,3,0];
+
+         let (pos, len) = first_match(&sequence, &subsequence);
+         // println!("sequence: {:#x?}", &sequence[0..sequence.len()]);
+         // println!("subsequence: {:#x?}", &subsequence[0..subsequence.len()]);
+         println!("Match: {}, {}", pos, len);
+         assert!(sequence[pos..pos+len] == subsequence[0..len], "This is not a match");
+      }
+   }
+
+   #[test]
+   fn alternative_best_match_impl_test() {
+      for _ in 0..8 {
+         let mut sequence: [u8; 64] = [0; 64];
+         fill_with_random(&mut sequence, 4);
+         let subsequence: [u8; 8] = [0,3,1,2,1,0,3,0];
+
+         let threshold = 3;
+         let (pos, len) = best_match(&sequence, &subsequence, threshold, 0);
+
+         let alt_find = || {
+            for len in (threshold..subsequence.len()).rev() {
+               if let Some(pos) = sequence.windows(len).position(|window| window == &subsequence[0..len]) {
+                  return (pos, len);
+               }
+            }
+            (0, 0)
+         };
+
+         let (pos1, len1) = alt_find();
+         assert!(pos == pos1 && len == len1, "Results don't match");
+         println!("pos: {}, len: {}", pos, len);
+      }
+   }
 }
