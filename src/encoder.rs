@@ -2,7 +2,6 @@
 use super::*;
 use super::{history_reader::*, search};
 use bitbit::BitWriter;
-use std::cmp;
 use std::io::{Read, Result, Write};
 
 pub struct Encoder {
@@ -14,10 +13,14 @@ pub struct Encoder {
 
 impl Encoder {
     pub fn new(history_addr_nbits: u8, match_length_nbits: u8, search_depth: u8) -> Encoder {
-        let history_interval_msg = format!("History address size must be in range of [{}, {}] bits", 
-            MIN_HISTORY_ADDR_BITS, MAX_HISTORY_ADDR_BITS);
-        let match_len_interval_msg = format!("Match length size must be in range of [{}, {}] bits", 
-            MIN_MATCH_LENGTH_BITS, MAX_MATCH_LENGTH_BITS);
+        let history_interval_msg = format!(
+            "History address size must be in range of [{}, {}] bits",
+            MIN_HISTORY_ADDR_BITS, MAX_HISTORY_ADDR_BITS
+        );
+        let match_len_interval_msg = format!(
+            "Match length size must be in range of [{}, {}] bits",
+            MIN_MATCH_LENGTH_BITS, MAX_MATCH_LENGTH_BITS
+        );
         assert!(
             history_addr_nbits >= 3 && history_addr_nbits <= 31,
             history_interval_msg
@@ -31,9 +34,8 @@ impl Encoder {
             "History size has to be bigger than current window size"
         );
 
-        let record_1_size: u8 = 1 + history_addr_nbits + match_length_nbits;
-        let record_2_size: u8 = 1 + 8;
-        let threshold: u8 = (record_1_size / record_2_size) + 1;
+        let threshold =
+            calc_threshold(history_addr_nbits as usize, match_length_nbits as usize) as u8;
 
         Encoder {
             threshold,
@@ -71,10 +73,10 @@ impl Encoder {
             match_len = bmatch.1;
             let bytes_encoded = if match_len > 0 {
                 assert!(match_len >= threshold);
-                self.write_record_1(&mut bw, match_pos, match_len)?;
+                self.write_reference_record(&mut bw, match_pos, match_len)?;
                 match_len
             } else {
-                self.write_record_2(&mut bw, window[0])?;
+                self.write_literal_record(&mut bw, window[0])?;
                 1
             };
             assert!(match_len <= window.len());
@@ -96,8 +98,13 @@ impl Encoder {
         Ok(())
     }
 
-    fn write_record_1<W: Write>(&self, bw: &mut BitWriter<W>, pos: usize, length: usize) -> Result<()> {
-        bw.write_bit(false)?;
+    fn write_reference_record<W: Write>(
+        &self,
+        bw: &mut BitWriter<W>,
+        pos: usize,
+        length: usize,
+    ) -> Result<()> {
+        bw.write_bit(RECORD_TYPE_REFERENCE)?;
         // Downcasting. But we limit possible positions (and lengths) in the beginning (when creating Decoder).
         bw.write_bits(pos as u32, self.history_addr_nbits as usize)?;
         // Not encoding with this type of record if it's shorter match than threshold
@@ -106,12 +113,11 @@ impl Encoder {
         Ok(())
     }
 
-    fn write_record_2<W: Write>(&self, bw: &mut BitWriter<W>, byte: u8) -> Result<()> {
-        bw.write_bit(true)?;
+    fn write_literal_record<W: Write>(&self, bw: &mut BitWriter<W>, byte: u8) -> Result<()> {
+        bw.write_bit(RECORD_TYPE_LITERAL)?;
         bw.write_byte(byte)?;
         Ok(())
     }
-
 
     fn write_header<W: Write>(&self, bw: &mut BitWriter<W>) -> Result<()> {
         bw.write_bits(self.history_addr_nbits as u32, BITS_FOR_HISTORY_ADDR_NBTIS)?;
