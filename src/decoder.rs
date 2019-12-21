@@ -4,6 +4,7 @@ use slice_deque::SliceDeque;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 
 // TODO: Make encoder use this too?
+#[derive(Debug)]
 enum Record {
     Reference { position: usize, length: usize },
     Literal { byte: u8 },
@@ -24,6 +25,7 @@ impl<R: Read, W: Write> Decoder<R, W> {
         let mut br: BitReader<_, MSB> = BitReader::new(reader);
 
         let (history_addr_nbits, match_length_nbits) = Decoder::<R, W>::read_header(&mut br)?;
+        println!("Header: ({}, {})", history_addr_nbits, match_length_nbits);
         assert!(
             history_addr_nbits >= MIN_HISTORY_ADDR_BITS
                 && history_addr_nbits <= MAX_HISTORY_ADDR_BITS
@@ -52,12 +54,17 @@ impl<R: Read, W: Write> Decoder<R, W> {
         // Read beginning of a file
         self.init()?;
 
+        println!("Initial history: {}", std::str::from_utf8(self.history.as_slice()).unwrap());
+        println!("Initial history length: {}", self.history.len());
+
         // Decode rest of a file
         loop {
             if let Some(record) = self.read_next_record()? {
+                println!("Read record: {:?}", &record);
                 self.write_decoded(&record)?;
             } else {
                 // None returned from read_next_record means file has ended
+                self.writer.flush()?;
                 return Ok(());
             }
         }
@@ -83,7 +90,7 @@ impl<R: Read, W: Write> Decoder<R, W> {
             },
             Err(error) => match error.kind() {
                 ErrorKind::UnexpectedEof => Ok(None),
-                _ => Err(error),
+                _ => Err(Error::new(error.kind(), format!("Error reading a record type bit: {}", error)))
             },
         }
     }
@@ -93,15 +100,25 @@ impl<R: Read, W: Write> Decoder<R, W> {
             Ok(byte) => Ok(Some(Record::Literal { byte })),
             Err(error) => match error.kind() {
                 ErrorKind::UnexpectedEof => Ok(None),
-                _ => Err(error),
+                _ => Err(Error::new(
+                        error.kind(),
+                        format!("Error while reading a literal record: {}", error),
+                ))
             },
         }
     }
 
     fn read_reference(&mut self) -> Result<Option<Record>> {
-        let position = self.br.read_bits(self.history_addr_nbits)? as usize;
-        let length = self.br.read_bits(self.match_length_nbits)? as usize;
-        Ok(Some(Record::Reference { position, length }))
+        let res: Result<Option<Record>> = {
+            let position = self.br.read_bits(self.history_addr_nbits)? as usize;
+            let length = self.br.read_bits(self.match_length_nbits)? as usize;
+            Ok(Some(Record::Reference { position, length }))
+        }; 
+        if let Err(error) = res {
+            Err(Error::new(error.kind(), format!("Error while reading a reference record: {}", error)))
+        } else {
+            res
+        }
     }
 
     // Read unencoded beginning of a file
@@ -132,6 +149,8 @@ impl<R: Read, W: Write> Decoder<R, W> {
             }
         };
         let bytes = byte_vec.as_slice();
+
+        //println!("Writing: {}", std::str::from_utf8(bytes).unwrap());
         // Could hang?
         self.writer.write_all(bytes)?;
 

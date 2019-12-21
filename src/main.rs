@@ -78,7 +78,7 @@ fn main() {
     } else if subcommand_str == "decode" {
         let sub_arg_matches = arg_matches.subcommand_matches("decode").unwrap();
 
-        let filepath = sub_arg_matches.value_of("ARCHIVE_PATH").unwrap();
+        let filepath = sub_arg_matches.value_of("ARCHIVE").unwrap();
         let source_file = File::open(filepath).unwrap();
         let mut buff_reader = BufReader::new(source_file);
 
