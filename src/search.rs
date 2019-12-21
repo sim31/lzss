@@ -58,6 +58,7 @@ pub fn best_match(sequence: &[u8],
                matches_found += 1; // Only counting matches which reach threshold
                println!("new_match: ({}, {}), matches_found: {}, best_match: ({}, {}), new pos: {}", 
                   match_pos, match_len, matches_found, best_match.0, best_match.1, pos);
+               assert!(sequence[match_pos..match_pos+match_len] == subsequence[0..match_len]);
             }
       } else { // No match was found. Means we have searched all of it.
             break;
