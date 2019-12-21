@@ -2,6 +2,7 @@
 extern crate clap;
 use clap::AppSettings;
 use lzss::encoder::Encoder;
+use lzss::decoder;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 
@@ -14,7 +15,7 @@ fn main() {
             (@arg FILE: +required "File to encode")
             (@arg ARCHIVE_PATH: +required "Resulting archive path")
             (@arg history_size: -s +takes_value default_value("12") "History window address size in bits")
-            (@arg current_size: -c +takes_value default_value("4") "Current window address size in bits")
+            (@arg match_length_size: -c +takes_value default_value("4") "Match record length in bits. Determines size of the current window as well.")
             (@arg search_depth: -d +takes_value default_value("0") 
                 "Search depth for searching history for matches. 0 - all matches are found and the longest chosen. 1 - The first match is used")
             (@arg overwrite: -o --overwrite "Overwrite existing file")
@@ -60,7 +61,7 @@ fn main() {
                 .parse()
                 .expect("Unable to parse history_size"),
             sub_arg_matches
-                .value_of("current_size")
+                .value_of("match_length_size")
                 .unwrap()
                 .parse()
                 .expect("Unable to parse current_size"),
@@ -74,14 +75,36 @@ fn main() {
         if res.is_err() {
             panic!("Error encoding: {}", res.err().unwrap());
         }
-    } else {
-        panic!("Not implemented yet");
-    }
+    } else if subcommand_str == "decode" {
+        let sub_arg_matches = arg_matches.subcommand_matches("decode").unwrap();
 
-    // encode(buff_reader, )
-    // let mut br: BitReader<_, MSB> = BitReader::new(buff_reader);
-    // let num = br.read_bits(5).unwrap();
-    // println!("{}", num);
+        let filepath = sub_arg_matches.value_of("ARCHIVE_PATH").unwrap();
+        let source_file = File::open(filepath).unwrap();
+        let mut buff_reader = BufReader::new(source_file);
+
+        let filepath = sub_arg_matches.value_of("FILE_PATH").unwrap();
+        let dest_file = if sub_arg_matches.is_present("overwrite") {
+            OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(filepath)
+                .unwrap()
+        } else {
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(filepath)
+                .unwrap()
+        };
+        let mut buff_writer = BufWriter::new(dest_file);
+
+        let res = decoder::decode(&mut buff_reader, &mut buff_writer);
+        if res.is_err() {
+            panic!("Error decoding: {}", res.err().unwrap());
+        }
+    } else {
+        panic!("Unknown command");
+    }
 }
 
 // fn construct_archive_path(filepath: &str) -> String {
