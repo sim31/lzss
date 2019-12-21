@@ -69,7 +69,7 @@ impl<R: Read, W: Write> Decoder<R, W> {
     fn read_next_record(&mut self) -> Result<Option<Record>> {
         // There are two valid ways for an archive file to end:
         //  1. At the byte boundary (if the end of the last record is at the byte boundary)
-        //  2. Or if the end of the last record is in the middle of the byte,
+        //  2. Or if last record does not end at byte boundary,
         //  it has to end with a 1 and padding till the next byte boundary
         //  (which creates an invalid literal record - that's how we know it's the end).
         // If we get EOF when reading type bit, it's the first type of ending.

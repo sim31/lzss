@@ -8,7 +8,8 @@ pub struct Encoder {
     threshold: u8,          // When to encode
     history_addr_nbits: u8, // Number of bits used for addressing history
     match_length_nbits: u8, // Number of bits used for specifying length of a match
-    search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
+    search_depth: u8,       // 0 - longest match, 1 - first match, 2 - longest of the first two matches
+    bytes_written: usize,
 }
 
 impl Encoder {
@@ -42,10 +43,11 @@ impl Encoder {
             history_addr_nbits,
             match_length_nbits,
             search_depth,
+            bytes_written: 0,
         }
     }
 
-    pub fn encode<R: Read, W: Write>(&self, reader: &mut R, writer: &mut W) -> Result<()> {
+    pub fn encode<R: Read, W: Write>(&mut self, reader: &mut R, writer: &mut W) -> Result<()> {
         let mut bw = BitWriter::new(&mut *writer);
         self.write_header(&mut bw)?;
 
@@ -62,6 +64,7 @@ impl Encoder {
         let mut reader = HistoryReader::new(reader, history_size, current_window_size)?;
 
         let (mut history, mut window) = reader.current();
+        self.write_initial_history(&mut bw, Vec::from(history).as_slice())?;
 
         // println!("History: {:#x?}", history);
         // println!("Window: {:#x?}", window);
@@ -92,30 +95,71 @@ impl Encoder {
             // println!("Run: {}", i);
         }
 
-        bw.pad_to_byte()?;
+        self.write_ending(&mut bw)?;
         writer.flush()?;
 
         Ok(())
     }
 
     fn write_reference_record<W: Write>(
-        &self,
+        &mut self,
         bw: &mut BitWriter<W>,
         pos: usize,
         length: usize,
     ) -> Result<()> {
         bw.write_bit(RECORD_TYPE_REFERENCE)?;
+        // FIXME: Store nbits fields as usize
+        let history_addr_nbits = self.history_addr_nbits as usize;
+        let match_length_nbits = self.match_length_nbits as usize;
         // Downcasting. But we limit possible positions (and lengths) in the beginning (when creating Decoder).
-        bw.write_bits(pos as u32, self.history_addr_nbits as usize)?;
+        bw.write_bits(pos as u32, history_addr_nbits)?;
         // Not encoding with this type of record if it's shorter match than threshold
         let enc_len = length + (self.threshold as usize);
-        bw.write_bits(enc_len as u32, self.history_addr_nbits as usize)?;
+        bw.write_bits(enc_len as u32, match_length_nbits)?;
+
+        self.bytes_written += 1 + history_addr_nbits + match_length_nbits;
         Ok(())
     }
 
-    fn write_literal_record<W: Write>(&self, bw: &mut BitWriter<W>, byte: u8) -> Result<()> {
+    fn write_literal_record<W: Write>(&mut self, bw: &mut BitWriter<W>, byte: u8) -> Result<()> {
         bw.write_bit(RECORD_TYPE_LITERAL)?;
         bw.write_byte(byte)?;
+
+        self.bytes_written += 1 + 8;
+
+        Ok(())
+    }
+
+    fn write_ending<W: Write>(&mut self, bw: &mut BitWriter<W>) -> Result<()> {
+        // There are two valid ways for an archive file to end:
+        //  1. At the byte boundary (if the end of the last record is at the byte boundary)
+        //  2. Or if last record does not end at byte boundary,
+        //  it has to end with a 1 and padding till the next byte boundary
+        //  (which creates an invalid literal record - that's how we know it's the end).
+        // If we get EOF when reading type bit, it's the first type of ending.
+        // If we get a literal type bit and EOF while reading it's byte, it means it's the second type of ending.
+        // Every other case of EOF is interpreted as InvalidData error.
+        if self.bytes_written % 8 != 0 {
+            bw.write_bit(RECORD_TYPE_LITERAL)?;
+            bw.pad_to_byte()?;
+        }
+        Ok(())
+    }
+
+    // Writes initial history un-encoded.
+    // File needs to begin this way so that decoder has some dictionary to start with
+    fn write_initial_history<W: Write>(
+        &mut self,
+        bw: &mut BitWriter<W>,
+        bytes: &[u8],
+    ) -> Result<()> {
+        // TODO: Optimize to write in words of 32 bits (as BitWriter allows it)
+        // But then you have endiandness to worry about
+        for byte in bytes {
+            bw.write_byte(*byte)?;
+        }
+
+        self.bytes_written += bytes.len();
         Ok(())
     }
 

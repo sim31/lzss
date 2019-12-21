@@ -54,7 +54,7 @@ fn main() {
         };
         let mut buff_writer = BufWriter::new(dest_file);
 
-        let encoder = Encoder::new(
+        let mut encoder = Encoder::new(
             sub_arg_matches
                 .value_of("history_size")
                 .unwrap()
