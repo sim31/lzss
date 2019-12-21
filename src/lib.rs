@@ -112,25 +112,28 @@ impl Encoder {
         let mut reader =
             HistoryReader::new(reader, history_size as usize, current_window_size as usize)?;
 
-        let (mut window, mut history) = reader.current();
+        let (mut history, mut window) = reader.current();
 
-        // println!("History: {:#x?}", history);
-        // println!("Window: {:#x?}", window);
+        println!("History: {:#x?}", history);
+        println!("Window: {:#x?}", window);
         let (mut match_pos, mut match_len) = (0, 0);
         while !window.is_empty() {
             let win_len = window.len();
             let move_bytes = cmp::min(win_len, cmp::min(1, match_len));
-            let new = reader.next(move_bytes)?;
+            //let new = reader.next(move_bytes)?;
+            let new = reader.next(cmp::min(win_len, 5))?;
             history = new.0;
             window = new.1;
+            println!("History_size: {}, {}", history.len(), history_size);
+            assert!(history.len() <= history_size as usize);
 
-            let bmatch = self.find_best_match(history, window);
-            match_pos = bmatch.0;
-            match_len = bmatch.1;
-            println!("pos: {}, len: {}", match_pos, match_len);
+            // let bmatch = self.find_best_match(history, window);
+            // match_pos = bmatch.0;
+            // match_len = bmatch.1;
+            // println!("pos: {}, len: {}", match_pos, match_len);
 
-            // println!("History: {:#x?}", history);
-            // println!("Window: {:#x?}", window);
+            println!("History: {:#x?}", history);
+            println!("Window: {:#x?}", window);
             // println!("Run: {}", i);
         }
 

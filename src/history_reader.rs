@@ -1,6 +1,7 @@
 //use bitbit::{BitReader, BitWriter, MSB};
 use slice_deque::SliceDeque;
 use std::io::{Error, ErrorKind, Read, Result};
+use std::cmp;
 
 pub struct HistoryReader<R: Read> {
     reader: R,
@@ -54,16 +55,25 @@ impl<R: Read> HistoryReader<R> {
                 some bytes will skip current window."
         );
         assert!(self.window_size > 0);
+        assert!(self.current_history_size <= self.history_size);
+
+        println!(
+            "current_history_size: {}, current_window_size: {}",
+            self.current_history_size, self.window_size
+        );
 
         let new_size = buff_len + move_bytes;
+        // Checking if we don't exceed initial capacity
+        assert!(new_size <= self.history_size + self.window_size * 2);
         self.buffer.resize(new_size, 0);
         let buff = &mut self.buffer[buff_len..new_size];
-
         let bytes_read = self.reader.read(buff)?;
-        // println!(
-        //     "window_size: {}, move_bytes: {}, bytes_read: {}",
-        //     self.window_size, move_bytes, bytes_read
-        // );
+
+        println!(
+            "window_size: {}, move_bytes: {}, bytes_read: {}",
+            self.window_size, move_bytes, bytes_read
+        );
+
 
         let (to_pop, history_size_change) = if bytes_read < move_bytes {
             // Current window should get smaller by this amount
@@ -73,7 +83,9 @@ impl<R: Read> HistoryReader<R> {
             for _ in 0..size_change {
                 self.buffer.pop_back();
             }
-            (bytes_read, size_change)
+            let history_diff = self.history_size - self.current_history_size;
+            let history_change = cmp::min(move_bytes, history_diff);
+            (move_bytes - history_change, history_change)
         } else {
             // bytes_read == move_bytes
             let history_diff = self.history_size - self.current_history_size;
@@ -91,11 +103,11 @@ impl<R: Read> HistoryReader<R> {
             self.buffer.pop_front();
         }
 
+        println!(
+            "current_history_size: {}, current_window_size: {}",
+            self.current_history_size, self.window_size
+        );
         let buff_len = self.buffer.len();
-        // println!(
-        //     "current_history_size: {}, current_window_size: {}",
-        //     self.current_history_size, self.window_size
-        // );
         Ok((
             &self.buffer[0..self.current_history_size],
             &self.buffer[self.current_history_size..buff_len],
