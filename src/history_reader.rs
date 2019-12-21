@@ -57,10 +57,10 @@ impl<R: Read> HistoryReader<R> {
         assert!(self.window_size > 0);
         assert!(self.current_history_size <= self.history_size);
 
-        println!(
-            "current_history_size: {}, current_window_size: {}",
-            self.current_history_size, self.window_size
-        );
+        // println!(
+        //     "current_history_size: {}, current_window_size: {}",
+        //     self.current_history_size, self.window_size
+        // );
 
         let new_size = buff_len + move_bytes;
         // Checking if we don't exceed initial capacity
@@ -69,10 +69,10 @@ impl<R: Read> HistoryReader<R> {
         let buff = &mut self.buffer[buff_len..new_size];
         let bytes_read = self.reader.read(buff)?;
 
-        println!(
-            "window_size: {}, move_bytes: {}, bytes_read: {}",
-            self.window_size, move_bytes, bytes_read
-        );
+        // println!(
+        //     "window_size: {}, move_bytes: {}, bytes_read: {}",
+        //     self.window_size, move_bytes, bytes_read
+        // );
 
 
         let (to_pop, history_size_change) = if bytes_read < move_bytes {
@@ -103,16 +103,17 @@ impl<R: Read> HistoryReader<R> {
             self.buffer.pop_front();
         }
 
-        println!(
-            "current_history_size: {}, current_window_size: {}",
-            self.current_history_size, self.window_size
-        );
+        // println!(
+        //     "current_history_size: {}, current_window_size: {}",
+        //     self.current_history_size, self.window_size
+        // );
         let buff_len = self.buffer.len();
         Ok((
             &self.buffer[0..self.current_history_size],
             &self.buffer[self.current_history_size..buff_len],
         ))
     }
+
     // Returns slices containing current history and current window
     pub fn current(&self) -> (&[u8], &[u8]) {
         assert!(self.current_history_size >= self.window_size);

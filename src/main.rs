@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
 use clap::AppSettings;
-use lzss::*;
+use lzss::encoder::Encoder;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 
