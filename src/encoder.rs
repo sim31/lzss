@@ -1,9 +1,9 @@
 //use bitbit::{BitReader, BitWriter, MSB};
-use bitbit::BitWriter;
-use super::{history_reader::*, search};
 use super::*;
-use std::io::{Read, Result, Write};
+use super::{history_reader::*, search};
+use bitbit::BitWriter;
 use std::cmp;
+use std::io::{Read, Result, Write};
 
 pub struct Encoder {
     threshold: u8,          // When to encode
@@ -48,9 +48,9 @@ impl Encoder {
             HistoryAddress::pow(2 as HistoryAddress, self.history_addr_nbits as u32);
         let current_window_size: MatchLength =
             MatchLength::pow(2 as MatchLength, self.match_length_nbits as u32);
-        let (history_size, current_window_size) = (history_size as usize, current_window_size as usize);
-        let mut reader =
-            HistoryReader::new(reader, history_size, current_window_size)?;
+        let (history_size, current_window_size) =
+            (history_size as usize, current_window_size as usize);
+        let mut reader = HistoryReader::new(reader, history_size, current_window_size)?;
 
         let (mut history, mut window) = reader.current();
 

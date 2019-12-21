@@ -1,7 +1,7 @@
 //use bitbit::{BitReader, BitWriter, MSB};
 use slice_deque::SliceDeque;
-use std::io::{Error, ErrorKind, Read, Result};
 use std::cmp;
+use std::io::{Error, ErrorKind, Read, Result};
 
 pub struct HistoryReader<R: Read> {
     reader: R,
@@ -73,7 +73,6 @@ impl<R: Read> HistoryReader<R> {
         //     "window_size: {}, move_bytes: {}, bytes_read: {}",
         //     self.window_size, move_bytes, bytes_read
         // );
-
 
         let (to_pop, history_size_change) = if bytes_read < move_bytes {
             // Current window should get smaller by this amount
