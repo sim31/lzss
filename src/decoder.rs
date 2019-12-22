@@ -1,5 +1,6 @@
 use super::*;
 use bitbit::{BitReader, MSB};
+use log::debug;
 use slice_deque::SliceDeque;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 
@@ -18,6 +19,7 @@ pub struct Decoder<R: Read, W: Write> {
     history: SliceDeque<u8>,
     history_size: usize,
     current_window_size: usize,
+    threshold: usize,
 }
 
 impl<R: Read, W: Write> Decoder<R, W> {
@@ -25,7 +27,7 @@ impl<R: Read, W: Write> Decoder<R, W> {
         let mut br: BitReader<_, MSB> = BitReader::new(reader);
 
         let (history_addr_nbits, match_length_nbits) = Decoder::<R, W>::read_header(&mut br)?;
-        println!("Header: ({}, {})", history_addr_nbits, match_length_nbits);
+        debug!("Header: ({}, {})", history_addr_nbits, match_length_nbits);
         assert!(
             history_addr_nbits >= MIN_HISTORY_ADDR_BITS
                 && history_addr_nbits <= MAX_HISTORY_ADDR_BITS
@@ -37,7 +39,7 @@ impl<R: Read, W: Write> Decoder<R, W> {
 
         let history_size: usize = usize::pow(2, history_addr_nbits as u32);
         let threshold = calc_threshold(history_addr_nbits, match_length_nbits);
-        let current_window_size = usize::pow(2, match_length_nbits as u32) + threshold;
+        let current_window_size = usize::pow(2, match_length_nbits as u32) + threshold - 1;
 
         Ok(Decoder {
             br,
@@ -47,6 +49,7 @@ impl<R: Read, W: Write> Decoder<R, W> {
             history: SliceDeque::<u8>::with_capacity(history_size),
             history_size,
             current_window_size,
+            threshold,
         })
     }
 
@@ -54,13 +57,14 @@ impl<R: Read, W: Write> Decoder<R, W> {
         // Read beginning of a file
         self.init()?;
 
-        println!("Initial history: {}", std::str::from_utf8(self.history.as_slice()).unwrap());
-        println!("Initial history length: {}", self.history.len());
+        // debug!("Initial history: {}", std::str::from_utf8_unchecked(self.history.as_slice()));
+        debug!("Initial history: {:?}", self.history.as_slice());
+        debug!("Initial history length: {}", self.history.len());
 
         // Decode rest of a file
         loop {
             if let Some(record) = self.read_next_record()? {
-                println!("Read record: {:?}", &record);
+                debug!("Record: {:?}", &record);
                 self.write_decoded(&record)?;
             } else {
                 // None returned from read_next_record means file has ended
@@ -90,7 +94,10 @@ impl<R: Read, W: Write> Decoder<R, W> {
             },
             Err(error) => match error.kind() {
                 ErrorKind::UnexpectedEof => Ok(None),
-                _ => Err(Error::new(error.kind(), format!("Error reading a record type bit: {}", error)))
+                _ => Err(Error::new(
+                    error.kind(),
+                    format!("Error reading a record type bit: {}", error),
+                )),
             },
         }
     }
@@ -101,24 +108,38 @@ impl<R: Read, W: Write> Decoder<R, W> {
             Err(error) => match error.kind() {
                 ErrorKind::UnexpectedEof => Ok(None),
                 _ => Err(Error::new(
-                        error.kind(),
-                        format!("Error while reading a literal record: {}", error),
-                ))
+                    error.kind(),
+                    format!("Error while reading a literal record: {}", error),
+                )),
             },
         }
     }
 
     fn read_reference(&mut self) -> Result<Option<Record>> {
-        let res: Result<Option<Record>> = {
-            let position = self.br.read_bits(self.history_addr_nbits)? as usize;
-            let length = self.br.read_bits(self.match_length_nbits)? as usize;
-            Ok(Some(Record::Reference { position, length }))
-        }; 
-        if let Err(error) = res {
-            Err(Error::new(error.kind(), format!("Error while reading a reference record: {}", error)))
-        } else {
-            res
+        let handle_error = |res: Result<(u32)>| match res {
+            Err(error) => Err(Error::new(
+                error.kind(),
+                format!("Error while reading a reference record: {}", error),
+            )),
+            Ok(r) => Ok(r),
+        };
+        let position = handle_error(self.br.read_bits(self.history_addr_nbits))? as usize;
+        let length =
+            handle_error(self.br.read_bits(self.match_length_nbits))? as usize + self.threshold;
+
+        if position >= self.history.len() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Invalid record: position bigger than curret history size",
+            ));
+        } else if length > self.current_window_size {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Invalid record: length bigger than possible current window size",
+            ));
         }
+
+        Ok(Some(Record::Reference { position, length }))
     }
 
     // Read unencoded beginning of a file
@@ -144,13 +165,16 @@ impl<R: Read, W: Write> Decoder<R, W> {
         let byte_vec: Vec<u8> = match record {
             Record::Literal { byte } => vec![*byte],
             Record::Reference { position, length } => {
-                assert!(*length <= self.current_window_size);
+                // TODO: Delete
+                if *position == 2413 && *length == 16 {
+                    assert!(*length <= self.current_window_size);
+                }
                 Vec::from(&self.history[*position..*position + *length])
             }
         };
         let bytes = byte_vec.as_slice();
 
-        //println!("Writing: {}", std::str::from_utf8(bytes).unwrap());
+        //debug!("Writing: {}", std::str::from_utf8(bytes).unwrap());
         // Could hang?
         self.writer.write_all(bytes)?;
 

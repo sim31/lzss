@@ -2,13 +2,14 @@
 use super::*;
 use super::{history_reader::*, search};
 use bitbit::BitWriter;
+use log::debug;
 use std::io::{Read, Result, Write};
 
 pub struct Encoder {
     threshold: u8,          // When to encode
     history_addr_nbits: u8, // Number of bits used for addressing history
     match_length_nbits: u8, // Number of bits used for specifying length of a match
-    search_depth: u8,       // 0 - longest match, 1 - first match, 2 - longest of the first two matches
+    search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
     bytes_written: usize,
 }
 
@@ -57,7 +58,8 @@ impl Encoder {
         let current_window_size: MatchLength =
             MatchLength::pow(2 as MatchLength, self.match_length_nbits as u32);
         // Increasing window size by threshold, because we won't be encoding matches shorter than threshold
-        let current_window_size = (current_window_size as usize) + (self.threshold as usize);
+        // Decreasing window size by one because we cannot encode the largest possible length of 2^n with n bits.
+        let current_window_size = (current_window_size as usize) + (self.threshold as usize) - 1;
         let history_size = history_size as usize;
         let (history_size, current_window_size) =
             (history_size as usize, current_window_size as usize);
@@ -66,8 +68,8 @@ impl Encoder {
         let (mut history, mut window) = reader.current();
         self.write_initial_history(&mut bw, Vec::from(history).as_slice())?;
 
-        // println!("History: {:#x?}", history);
-        // println!("Window: {:#x?}", window);
+        // debug!("History: {:#x?}", history);
+        // debug!("Window: {:#x?}", window);
         let (threshold, search_depth) = (self.threshold as usize, self.search_depth as usize);
         let (mut match_pos, mut match_len): (usize, usize);
         while !window.is_empty() {
@@ -83,16 +85,17 @@ impl Encoder {
                 1
             };
             assert!(match_len <= window.len());
-            println!("pos: {}, len: {}", match_pos, match_len);
+            assert!(match_pos < history.len());
+            // debug!("pos: {}, len: {}", match_pos, match_len);
 
             let new = reader.next(bytes_encoded)?;
             // let new = reader.next(cmp::min(win_len, 5))?;
             history = new.0;
             window = new.1;
             assert!(history.len() <= history_size);
-            // println!("History: {:#x?}", history);
-            // println!("Window: {:#x?}", window);
-            // println!("Run: {}", i);
+            // debug!("History: {:#x?}", history);
+            // debug!("Window: {:#x?}", window);
+            // debug!("Run: {}", i);
         }
 
         self.write_ending(&mut bw)?;
@@ -114,10 +117,16 @@ impl Encoder {
         // Downcasting. But we limit possible positions (and lengths) in the beginning (when creating Decoder).
         bw.write_bits(pos as u32, history_addr_nbits)?;
         // Not encoding with this type of record if it's shorter match than threshold
-        let enc_len = length + (self.threshold as usize);
-        bw.write_bits(enc_len as u32, match_length_nbits)?;
+        let enc_len = (length as u32) - (self.threshold as u32);
+        bw.write_bits(enc_len, match_length_nbits)?;
 
         self.bytes_written += 1 + history_addr_nbits + match_length_nbits;
+
+        debug!(
+            "Record: Reference {{ position: {}, length: {} }}",
+            pos, length
+        );
+
         Ok(())
     }
 
@@ -127,6 +136,7 @@ impl Encoder {
 
         self.bytes_written += 1 + 8;
 
+        debug!("Record: Literal {{ byte: {} }}", byte);
         Ok(())
     }
 
@@ -160,12 +170,20 @@ impl Encoder {
         }
 
         self.bytes_written += bytes.len();
+
+        // debug!("Initial history: {}", std::str::from_utf8_unchecked(bytes));
+        debug!("Initial history: {:?}", bytes);
+        debug!("Initial history length: {}", bytes.len());
         Ok(())
     }
 
     fn write_header<W: Write>(&self, bw: &mut BitWriter<W>) -> Result<()> {
         bw.write_bits(self.history_addr_nbits as u32, BITS_FOR_HISTORY_ADDR_NBTIS)?;
         bw.write_bits(self.match_length_nbits as u32, BITS_FOR_MATCH_LENGTH_NBITS)?;
+        debug!(
+            "Header: ({}, {})",
+            self.history_addr_nbits, self.match_length_nbits
+        );
         Ok(())
     }
 }

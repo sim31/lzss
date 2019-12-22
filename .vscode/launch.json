@@ -1,0 +1,67 @@
+{
+   // Use IntelliSense to learn about possible attributes.
+   // Hover to view descriptions of existing attributes.
+   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+   "version": "0.2.0",
+   "configurations": [
+      {
+         "type": "lldb",
+         "request": "launch",
+         "name": "Debug unit tests in library 'lzss'",
+         "cargo": {
+            "args": [
+               "test",
+               "--no-run",
+               "--lib",
+               "--package=lzss"
+            ],
+            "filter": {
+               "name": "lzss",
+               "kind": "lib"
+            }
+         },
+         "args": [],
+         "cwd": "${workspaceFolder}"
+      },
+      {
+         "type": "lldb",
+         "request": "launch",
+         "name": "Debug executable 'lzss'",
+         "cargo": {
+            "args": [
+               "build",
+               "--bin=lzss",
+               "--package=lzss"
+            ],
+            "filter": {
+               "name": "lzss",
+               "kind": "bin"
+            }
+         },
+         "args": [
+            "decode", "enc-files/grammar.lsp.lzss", "dec-files/grammar.lsp",
+            "-o"
+         ],
+         "cwd": "${workspaceFolder}"
+      },
+      {
+         "type": "lldb",
+         "request": "launch",
+         "name": "Debug unit tests in executable 'lzss'",
+         "cargo": {
+            "args": [
+               "test",
+               "--no-run",
+               "--bin=lzss",
+               "--package=lzss"
+            ],
+            "filter": {
+               "name": "lzss",
+               "kind": "bin"
+            }
+         },
+         "args": [],
+         "cwd": "${workspaceFolder}"
+      }
+   ]
+}

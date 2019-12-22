@@ -1,12 +1,17 @@
 #[macro_use]
 extern crate clap;
 use clap::AppSettings;
+use env_logger;
 use lzss::decoder;
 use lzss::encoder::Encoder;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Write};
 
 fn main() {
+    env_logger::builder()
+        .format(|buf, record| writeln!(buf, "{}", record.args()))
+        .init();
+
     let arg_matches = clap_app!(lzss =>
        (about: "LZSS compression, decompriossion")
        (version: "0.1.0")
@@ -100,7 +105,7 @@ fn main() {
 
         let res = decoder::decode(&mut buff_reader, &mut buff_writer);
         if res.is_err() {
-            panic!("Error decoding: {}", res.err().unwrap());
+            panic!("Error decoding: {}", res.err().unwrap().to_string());
         }
     } else {
         panic!("Unknown command");

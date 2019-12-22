@@ -57,7 +57,7 @@ impl<R: Read> HistoryReader<R> {
         assert!(self.window_size > 0);
         assert!(self.current_history_size <= self.history_size);
 
-        // println!(
+        // debug!(
         //     "current_history_size: {}, current_window_size: {}",
         //     self.current_history_size, self.window_size
         // );
@@ -69,7 +69,7 @@ impl<R: Read> HistoryReader<R> {
         let buff = &mut self.buffer[buff_len..new_size];
         let bytes_read = self.reader.read(buff)?;
 
-        // println!(
+        // debug!(
         //     "window_size: {}, move_bytes: {}, bytes_read: {}",
         //     self.window_size, move_bytes, bytes_read
         // );
@@ -102,7 +102,7 @@ impl<R: Read> HistoryReader<R> {
             self.buffer.pop_front();
         }
 
-        // println!(
+        // debug!(
         //     "current_history_size: {}, current_window_size: {}",
         //     self.current_history_size, self.window_size
         // );

@@ -39,9 +39,9 @@ pub fn best_match(
     threshold: usize,
     search_depth: usize,
 ) -> (usize, usize) {
-    // println!("\n----\nsequence: \"{}\"", std::str::from_utf8(sequence).unwrap());
-    // println!("subsequence: \"{}\"", std::str::from_utf8(subsequence).unwrap());
-    // println!("threshold: {}", threshold);
+    // debug!("\n----\nsequence: \"{}\"", std::str::from_utf8(sequence).unwrap());
+    // debug!("subsequence: \"{}\"", std::str::from_utf8(subsequence).unwrap());
+    // debug!("threshold: {}", threshold);
     let mut best_match: (usize, usize) = (0, 0);
     let (mut matches_found, mut pos): (usize, usize) = (0, 0);
     let seq_len = sequence.len();
@@ -60,10 +60,10 @@ pub fn best_match(
                     best_match = (match_pos, match_len);
                 }
                 matches_found += 1; // Only counting matches which reach threshold
-                println!(
-                    "new_match: ({}, {}), matches_found: {}, best_match: ({}, {}), new pos: {}",
-                    match_pos, match_len, matches_found, best_match.0, best_match.1, pos
-                );
+                                    // debug!(
+                                    //     "new_match: ({}, {}), matches_found: {}, best_match: ({}, {}), new pos: {}",
+                                    //     match_pos, match_len, matches_found, best_match.0, best_match.1, pos
+                                    // );
             }
         } else {
             // No match was found. Means we have searched all of it.
@@ -92,9 +92,9 @@ mod test {
             let subsequence: [u8; 8] = [0, 3, 3, 2, 1, 0, 3, 0];
 
             let (pos, len) = first_match(&sequence, &subsequence);
-            // println!("sequence: {:#x?}", &sequence[0..sequence.len()]);
-            // println!("subsequence: {:#x?}", &subsequence[0..subsequence.len()]);
-            println!("Match: {}, {}", pos, len);
+            // debug!("sequence: {:#x?}", &sequence[0..sequence.len()]);
+            // debug!("subsequence: {:#x?}", &subsequence[0..subsequence.len()]);
+            // debug!("Match: {}, {}", pos, len);
             assert!(
                 sequence[pos..pos + len] == subsequence[0..len],
                 "This is not a match"
@@ -126,7 +126,7 @@ mod test {
 
             let (pos1, len1) = alt_find();
             assert!(pos == pos1 && len == len1, "Results don't match");
-            println!("pos: {}, len: {}", pos, len);
+            // debug!("pos: {}, len: {}", pos, len);
         }
     }
 }
