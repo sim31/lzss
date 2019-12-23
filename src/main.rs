@@ -80,8 +80,8 @@ fn main() {
                 .expect("Unable to parse search_depth"),
         );
         let res = encoder.encode(&mut buff_reader, &mut buff_writer);
-        debug!("writer buffer: {:#x?}", buff_writer.buffer());
-        buff_writer.flush().unwrap();
+        // debug!("writer buffer: {:#x?}", buff_writer.buffer());
+        // buff_writer.flush().unwrap();
         if res.is_err() {
             panic!("Error encoding: {}", res.err().unwrap());
         }

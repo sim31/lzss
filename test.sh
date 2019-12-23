@@ -1,6 +1,6 @@
 #!/bin/bash
 
-POS_BITS=12
+POS_BITS=8
 LENGTH_BITS=4
 
 mkdir -p enc-files

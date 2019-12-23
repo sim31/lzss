@@ -100,7 +100,7 @@ impl Encoder {
 
         self.write_ending(&mut bw)?;
 
-        // writer.flush()?;
+        writer.flush()?;
 
         Ok(())
     }
