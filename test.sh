@@ -11,9 +11,11 @@ archive="enc-files/$1.lzss"
 decoded="dec-files/$1"
 
 echo -n "Encoding..."
-time RUST_BACKTRACE=1 RUST_LOG=debug cargo run -- encode $source_file $archive -c $LENGTH_BITS -s $POS_BITS -o > output.log 2>&1
+# time RUST_BACKTRACE=1 RUST_LOG=debug cargo run -- encode $source_file $archive -c $LENGTH_BITS -s $POS_BITS -o > output.log 2>&1
+time cargo run -- encode $source_file $archive -c $LENGTH_BITS -s $POS_BITS -o
 echo -n "Decoding..."
-time RUST_BACKTRACE=1 RUST_LOG=debug cargo run -- decode $archive $decoded -o > dec-output.log 2>&1
+# time RUST_BACKTRACE=1 RUST_LOG=debug cargo run -- decode $archive $decoded -o > dec-output.log 2>&1
+time RUST_BACKTRACE=1 cargo run -- decode $archive $decoded -o 
 
 echo "Original: "
 ls -l $source_file

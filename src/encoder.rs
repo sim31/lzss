@@ -10,7 +10,7 @@ pub struct Encoder {
     history_addr_nbits: u8, // Number of bits used for addressing history
     match_length_nbits: u8, // Number of bits used for specifying length of a match
     search_depth: u8, // 0 - longest match, 1 - first match, 2 - longest of the first two matches
-    bytes_written: usize,
+    bits_written: usize,
 }
 
 impl Encoder {
@@ -44,7 +44,7 @@ impl Encoder {
             history_addr_nbits,
             match_length_nbits,
             search_depth,
-            bytes_written: 0,
+            bits_written: 0,
         }
     }
 
@@ -99,7 +99,8 @@ impl Encoder {
         }
 
         self.write_ending(&mut bw)?;
-        writer.flush()?;
+
+        // writer.flush()?;
 
         Ok(())
     }
@@ -120,7 +121,7 @@ impl Encoder {
         let enc_len = (length as u32) - (self.threshold as u32);
         bw.write_bits(enc_len, match_length_nbits)?;
 
-        self.bytes_written += 1 + history_addr_nbits + match_length_nbits;
+        self.bits_written += 1 + history_addr_nbits + match_length_nbits;
 
         debug!(
             "Record: Reference {{ position: {}, length: {} }}",
@@ -134,7 +135,7 @@ impl Encoder {
         bw.write_bit(RECORD_TYPE_LITERAL)?;
         bw.write_byte(byte)?;
 
-        self.bytes_written += 1 + 8;
+        self.bits_written += 1 + 8;
 
         debug!("Record: Literal {{ byte: {} }}", byte);
         Ok(())
@@ -149,10 +150,12 @@ impl Encoder {
         // If we get EOF when reading type bit, it's the first type of ending.
         // If we get a literal type bit and EOF while reading it's byte, it means it's the second type of ending.
         // Every other case of EOF is interpreted as InvalidData error.
-        if self.bytes_written % 8 != 0 {
+        if self.bits_written % 8 != 0 {
             bw.write_bit(RECORD_TYPE_LITERAL)?;
-            bw.pad_to_byte()?;
+            self.bits_written += 1;
         }
+        bw.pad_to_byte()?;
+        debug!("Bits written: {}", self.bits_written);
         Ok(())
     }
 
@@ -169,7 +172,7 @@ impl Encoder {
             bw.write_byte(*byte)?;
         }
 
-        self.bytes_written += bytes.len();
+        self.bits_written += bytes.len() * 8;
 
         // debug!("Initial history: {}", std::str::from_utf8_unchecked(bytes));
         debug!("Initial history: {:?}", bytes);
@@ -177,13 +180,14 @@ impl Encoder {
         Ok(())
     }
 
-    fn write_header<W: Write>(&self, bw: &mut BitWriter<W>) -> Result<()> {
+    fn write_header<W: Write>(&mut self, bw: &mut BitWriter<W>) -> Result<()> {
         bw.write_bits(self.history_addr_nbits as u32, BITS_FOR_HISTORY_ADDR_NBTIS)?;
         bw.write_bits(self.match_length_nbits as u32, BITS_FOR_MATCH_LENGTH_NBITS)?;
         debug!(
             "Header: ({}, {})",
             self.history_addr_nbits, self.match_length_nbits
         );
+        self.bits_written += BITS_FOR_HISTORY_ADDR_NBTIS + BITS_FOR_MATCH_LENGTH_NBITS;
         Ok(())
     }
 }

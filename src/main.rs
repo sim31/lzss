@@ -6,6 +6,7 @@ use lzss::decoder;
 use lzss::encoder::Encoder;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
+use log::debug;
 
 fn main() {
     env_logger::builder()
@@ -48,6 +49,7 @@ fn main() {
             OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(filepath)
                 .unwrap()
         } else {
@@ -57,6 +59,7 @@ fn main() {
                 .open(filepath)
                 .unwrap()
         };
+        // let mut buff_writer = dest_file;
         let mut buff_writer = BufWriter::new(dest_file);
 
         let mut encoder = Encoder::new(
@@ -77,6 +80,8 @@ fn main() {
                 .expect("Unable to parse search_depth"),
         );
         let res = encoder.encode(&mut buff_reader, &mut buff_writer);
+        debug!("writer buffer: {:#x?}", buff_writer.buffer());
+        buff_writer.flush().unwrap();
         if res.is_err() {
             panic!("Error encoding: {}", res.err().unwrap());
         }
@@ -92,6 +97,7 @@ fn main() {
             OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(filepath)
                 .unwrap()
         } else {
