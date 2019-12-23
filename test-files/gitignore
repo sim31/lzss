@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+*.lzss
+*.test
+*.log
+dec-files/*
