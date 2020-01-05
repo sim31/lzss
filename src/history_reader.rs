@@ -2,6 +2,7 @@
 use slice_deque::SliceDeque;
 use std::cmp;
 use std::io::{Error, ErrorKind, Read, Result};
+use log::debug;
 
 pub struct HistoryReader<R: Read> {
     reader: R,
@@ -43,6 +44,28 @@ impl<R: Read> HistoryReader<R> {
         Ok(r)
     }
 
+    // Returns less than end - start only when end of file is reached
+    fn read(&mut self, start: usize, end: usize) -> Result<usize> {
+        let mut st = start;
+        while st < end {
+            let buffer = &mut self.buffer[st..end];
+            match self.reader.read(buffer) {
+                Ok(n) => { 
+                    if n > 0 { st += n; } else { break; }
+                }
+                Err(error) => {
+                    match error.kind() {
+                        ErrorKind::Interrupted => { continue; },
+                        ErrorKind::UnexpectedEof => { break; }
+                        _ => { return Err(error); }
+                    }
+                }
+            }
+        }
+
+        Ok(st - start)
+    }
+
     // Slides windows a specified amount of bytes and returns slices to history and current windows
     // If file has ended, current window (slice 2) starts getting smaller until it's size becomes 0.
     pub fn next(&mut self, move_bytes: usize) -> Result<(&[u8], &[u8])> {
@@ -66,15 +89,15 @@ impl<R: Read> HistoryReader<R> {
         // Checking if we don't exceed initial capacity
         assert!(new_size <= self.history_size + self.window_size * 2);
         self.buffer.resize(new_size, 0);
-        let buff = &mut self.buffer[buff_len..new_size];
-        let bytes_read = self.reader.read(buff)?;
+        let bytes_read = self.read(buff_len, new_size)?;
 
-        // debug!(
-        //     "window_size: {}, move_bytes: {}, bytes_read: {}",
-        //     self.window_size, move_bytes, bytes_read
-        // );
+        debug!(
+            "window_size: {}, move_bytes: {}, bytes_read: {}",
+            self.window_size, move_bytes, bytes_read
+        );
 
         let (to_pop, history_size_change) = if bytes_read < move_bytes {
+            debug!("Read less than asked");
             // Current window should get smaller by this amount
             let size_change = move_bytes - bytes_read;
             self.window_size -= size_change;

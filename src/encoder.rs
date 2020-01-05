@@ -93,8 +93,8 @@ impl Encoder {
             history = new.0;
             window = new.1;
             assert!(history.len() <= history_size);
-            // debug!("History: {:#x?}", history);
-            // debug!("Window: {:#x?}", window);
+            debug!("History: {:#x?}", history);
+            debug!("Window: {:#x?}", window);
             // debug!("Run: {}", i);
         }
 

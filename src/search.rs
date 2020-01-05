@@ -1,4 +1,5 @@
 use std::cmp;
+use log::debug;
 
 // Find first byte string in sequence matching subsequence or beginning of subsequence
 // Returns the position of the first match and length of a matching byte string.
@@ -54,16 +55,16 @@ pub fn best_match(
         let match_pos = nmatch.0 + pos; // match_pos we get back is relative to the beginning of the search
         let match_len = nmatch.1;
         if match_len > 0 {
-            pos = match_pos + 1; // Continue search from the next byte
+            pos = match_pos + match_len; // Continue search from the next byte
             if match_len >= threshold {
                 if match_len > best_match.1 {
                     best_match = (match_pos, match_len);
                 }
                 matches_found += 1; // Only counting matches which reach threshold
-                                    // debug!(
-                                    //     "new_match: ({}, {}), matches_found: {}, best_match: ({}, {}), new pos: {}",
-                                    //     match_pos, match_len, matches_found, best_match.0, best_match.1, pos
-                                    // );
+                debug!(
+                    "new_match: ({}, {}), matches_found: {}, best_match: ({}, {}), new pos: {}",
+                    match_pos, match_len, matches_found, best_match.0, best_match.1, pos
+                );
             }
         } else {
             // No match was found. Means we have searched all of it.
